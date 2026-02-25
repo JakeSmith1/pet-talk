@@ -136,7 +136,7 @@ struct DuetPreviewView: View {
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                     Slider(value: $duetProject.leftTrack.pitchShift, in: -12...12, step: 0.5)
-                        .onChange(of: duetProject.leftTrack.pitchShift) { _, newValue in
+                        .onChange(of: duetProject.leftTrack.pitchShift) { newValue in
                             leftAnalyzer.setPitch(newValue)
                         }
                 }
@@ -150,7 +150,7 @@ struct DuetPreviewView: View {
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                     Slider(value: $duetProject.rightTrack.pitchShift, in: -12...12, step: 0.5)
-                        .onChange(of: duetProject.rightTrack.pitchShift) { _, newValue in
+                        .onChange(of: duetProject.rightTrack.pitchShift) { newValue in
                             rightAnalyzer.setPitch(newValue)
                         }
                 }
@@ -278,9 +278,11 @@ struct DuetPreviewView: View {
 
 // MARK: - Preview
 
-#Preview {
-    NavigationStack {
-        DuetPreviewView()
-            .environmentObject(DuetProject())
+struct DuetPreviewView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            DuetPreviewView()
+                .environmentObject(DuetProject())
+        }
     }
 }

@@ -33,7 +33,7 @@ struct MixingControlsView: View {
 
             Toggle("", isOn: $mixer.isMusicEnabled)
                 .labelsHidden()
-                .onChange(of: mixer.isMusicEnabled) { _, enabled in
+                .onChange(of: mixer.isMusicEnabled) { enabled in
                     project.backgroundMusicURL = enabled ? mixer.backgroundMusicURL : nil
                 }
         }
@@ -116,7 +116,7 @@ struct MixingControlsView: View {
 
             Slider(value: value, in: 0...1, step: 0.05)
                 .tint(tint)
-                .onChange(of: value.wrappedValue) { _, _ in
+                .onChange(of: value.wrappedValue) { _ in
                     mixer.setVolumes(voice: mixer.voiceVolume, music: mixer.musicVolume)
                     project.voiceVolume = mixer.voiceVolume
                     project.musicVolume = mixer.musicVolume
@@ -136,11 +136,13 @@ struct MixingControlsView: View {
 
 // MARK: - Preview
 
-#Preview {
-    MixingControlsView(
-        mixer: AudioMixer(),
-        showMusicPicker: .constant(false)
-    )
-    .environmentObject(PetTalkProject())
-    .padding()
+struct MixingControlsView_Previews: PreviewProvider {
+    static var previews: some View {
+        MixingControlsView(
+            mixer: AudioMixer(),
+            showMusicPicker: .constant(false)
+        )
+        .environmentObject(PetTalkProject())
+        .padding()
+    }
 }

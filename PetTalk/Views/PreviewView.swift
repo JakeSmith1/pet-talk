@@ -160,7 +160,7 @@ struct PreviewView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Slider(value: $project.pitchShift, in: -12...12, step: 0.5)
-                    .onChange(of: project.pitchShift) { _, newValue in
+                    .onChange(of: project.pitchShift) { newValue in
                         audioAnalyzer.setPitch(newValue)
                     }
                 Text("+12")

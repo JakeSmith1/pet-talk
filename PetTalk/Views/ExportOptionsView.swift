@@ -427,7 +427,9 @@ enum ExportFormat: String, CaseIterable, Identifiable, Codable {
 
 // MARK: - Preview
 
-#Preview {
-    ExportOptionsView(onDismiss: {})
-        .environmentObject(PetTalkProject())
+struct ExportOptionsView_Previews: PreviewProvider {
+    static var previews: some View {
+        ExportOptionsView(onDismiss: {})
+            .environmentObject(PetTalkProject())
+    }
 }

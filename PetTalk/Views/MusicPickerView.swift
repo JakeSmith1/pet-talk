@@ -233,7 +233,9 @@ struct MusicPickerView: View {
 
 // MARK: - Preview
 
-#Preview {
-    MusicPickerView(mixer: AudioMixer())
-        .environmentObject(PetTalkProject())
+struct MusicPickerView_Previews: PreviewProvider {
+    static var previews: some View {
+        MusicPickerView(mixer: AudioMixer())
+            .environmentObject(PetTalkProject())
+    }
 }

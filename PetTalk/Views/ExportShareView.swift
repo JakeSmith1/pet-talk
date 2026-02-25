@@ -237,9 +237,11 @@ struct ActivityViewController: UIViewControllerRepresentable {
 
 // MARK: - Preview
 
-#Preview {
-    NavigationStack {
-        ExportShareView()
-            .environmentObject(PetTalkProject())
+struct ExportShareView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            ExportShareView()
+                .environmentObject(PetTalkProject())
+        }
     }
 }

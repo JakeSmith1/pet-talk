@@ -58,7 +58,14 @@ struct SoundEffectPickerView: View {
         .listStyle(.plain)
         .overlay {
             if filteredEffects.isEmpty {
-                ContentUnavailableView.search(text: searchText)
+                VStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.secondary)
+                    Text("No results for \"\(searchText)\"")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -128,7 +135,7 @@ private struct SoundEffectRow: View {
             Image(systemName: isPlaying ? "stop.circle.fill" : "play.circle.fill")
                 .font(.system(size: 32))
                 .foregroundStyle(isPlaying ? .red : .blue)
-                .contentTransition(.symbolEffect(.replace))
+                .animation(.easeInOut(duration: 0.15), value: isPlaying)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isPlaying ? "Stop Preview" : "Preview")

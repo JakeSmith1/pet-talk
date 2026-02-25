@@ -27,7 +27,7 @@ struct VoiceCloningView: View {
         .navigationTitle("Voice Cloning")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 if !service.samples.isEmpty {
                     Button(role: .destructive) {
                         showResetConfirmation = true

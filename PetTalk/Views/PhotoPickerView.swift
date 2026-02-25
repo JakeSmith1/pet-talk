@@ -53,7 +53,7 @@ struct PhotoPickerView: View {
         } message: {
             Text(alertMessage)
         }
-        .onChange(of: selectedItem) {
+        .onChange(of: selectedItem) { _ in
             Task {
                 await handlePickerSelection()
             }
@@ -81,7 +81,7 @@ struct PhotoPickerView: View {
                     .navigationTitle("Adjust Mouth Region")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
+                        ToolbarItem(placement: .navigationBarTrailing) {
                             Button("Done") {
                                 showMouthEditor = false
                             }

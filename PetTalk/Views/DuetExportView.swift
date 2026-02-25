@@ -168,9 +168,11 @@ struct DuetExportView: View {
 
 // MARK: - Preview
 
-#Preview {
-    NavigationStack {
-        DuetExportView()
-            .environmentObject(DuetProject())
+struct DuetExportView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            DuetExportView()
+                .environmentObject(DuetProject())
+        }
     }
 }

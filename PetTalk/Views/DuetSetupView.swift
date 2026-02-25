@@ -126,7 +126,7 @@ struct TrackSetupPanel: View {
             // Status indicator
             statusIndicator
         }
-        .onChange(of: selectedPhotoItem) {
+        .onChange(of: selectedPhotoItem) { _ in
             Task { await handlePhotoSelection() }
         }
         .fullScreenCover(isPresented: $showCamera) {
@@ -391,9 +391,11 @@ private struct DuetCameraView: UIViewControllerRepresentable {
 
 // MARK: - Preview
 
-#Preview {
-    NavigationStack {
-        DuetSetupView()
-            .environmentObject(DuetProject())
+struct DuetSetupView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            DuetSetupView()
+                .environmentObject(DuetProject())
+        }
     }
 }

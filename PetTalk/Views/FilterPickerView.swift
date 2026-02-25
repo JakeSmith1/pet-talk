@@ -25,7 +25,7 @@ struct FilterPickerView: View {
             }
             .padding(.horizontal, 4)
         }
-        .task(id: sourceImage) {
+        .task(id: sourceImage?.hash) {
             await generateThumbnails()
         }
     }

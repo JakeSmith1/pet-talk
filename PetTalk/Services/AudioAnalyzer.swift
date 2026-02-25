@@ -16,6 +16,10 @@ final class AudioAnalyzer: ObservableObject {
     /// All amplitude samples captured by `analyzeFile(url:)` at the configured frame rate.
     @Published var amplitudes: [Float] = []
 
+    // MARK: - Init
+
+    init() {}
+
     // MARK: - Configuration
 
     /// Gain multiplier applied before clamping so quiet recordings remain visible.
