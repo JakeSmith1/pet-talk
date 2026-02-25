@@ -73,7 +73,7 @@ struct WaveformView: View {
                     let barHeight = max(minBarHeight, amplitude * maxBarHeight)
 
                     RoundedRectangle(cornerRadius: barWidth / 2)
-                        .fill(dimmed ? Color.secondary.opacity(0.25) : barGradient(amplitude: amplitude))
+                        .fill(dimmed ? AnyShapeStyle(Color.secondary.opacity(0.25)) : AnyShapeStyle(barGradient(amplitude: amplitude)))
                         .frame(width: barWidth, height: barHeight * 2)
                 }
             }

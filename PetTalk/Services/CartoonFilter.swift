@@ -122,7 +122,7 @@ enum CartoonFilter {
         case .pixellate:
             let pixellate = CIFilter.pixellate()
             pixellate.inputImage = input
-            pixellate.scale = max(input.extent.width / 80, 4)
+            pixellate.scale = Float(max(input.extent.width / 80, 4))
             return pixellate.outputImage
 
         case .crystallize:

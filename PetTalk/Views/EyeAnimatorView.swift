@@ -189,7 +189,7 @@ final class EyeAnimatorScene: SKScene {
                 let bdx = point.x - browCx
                 let bdy = point.y - browCy
                 let bDist = sqrt(bdx * bdx + bdy * bdy)
-                if bDist < browRadius, browRadius > .ulpOfOne {
+                if bDist < browRadius, browRadius > Float.ulpOfOne {
                     let falloff = 1.0 - (bDist / browRadius)
                     let smooth = falloff * falloff * (3.0 - 2.0 * falloff)
                     warpedPositions[index].y += browDisp * smooth
@@ -236,10 +236,10 @@ enum EyeAnimatorRenderer {
         skView.presentScene(scene)
         scene.updateWarp(eyeRegion: eyeRegion, blinkAmount: blinkAmount, eyebrowRaise: eyebrowRaise)
 
-        guard let texture = skView.texture(from: scene),
-              let cgImage = texture.cgImage() else {
+        guard let texture = skView.texture(from: scene) else {
             return nil
         }
+        let cgImage = texture.cgImage()
 
         return pixelBuffer(from: cgImage, size: size)
     }

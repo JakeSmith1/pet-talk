@@ -71,7 +71,7 @@ struct VisualEffectsView: View {
             HStack {
                 Image(systemName: systemImage)
                     .font(.subheadline)
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
                     .frame(width: 24)
 
                 Text(title)

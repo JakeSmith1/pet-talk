@@ -330,7 +330,10 @@ enum StickerPackExporter {
             }
 
             // Draw the cropped portion of the source image scaled to fill the output
-            image.draw(in: drawRect, from: rect, blendMode: .normal, alpha: 1.0)
+            // Draw the source rect into the output rect
+            if let cg = image.cgImage, let cropped = cg.cropping(to: rect) {
+                UIImage(cgImage: cropped).draw(in: drawRect)
+            }
 
             // Draw border if requested
             if addBorder {

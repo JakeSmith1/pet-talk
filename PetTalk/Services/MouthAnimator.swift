@@ -226,10 +226,10 @@ enum MouthAnimatorRenderer {
         let renderer = skView
 
         // Render the scene to an SKTexture, then to a CGImage.
-        guard let texture = renderer.texture(from: scene),
-              let cgImage = texture.cgImage() else {
+        guard let texture = renderer.texture(from: scene) else {
             return nil
         }
+        let cgImage = texture.cgImage()
 
         return pixelBuffer(from: cgImage, size: size)
     }

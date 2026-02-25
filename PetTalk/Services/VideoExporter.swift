@@ -178,14 +178,15 @@ enum VideoExporter {
             }
 
             // Render the composited frame on the main thread (SpriteKit requirement).
-            guard var pixelBuffer = await MainActor.run({
+            let maybeBuffer: CVPixelBuffer? = await MainActor.run {
                 MouthAnimatorRenderer.renderFrame(
                     image: image,
                     mouthRegion: mouthRegion,
                     amplitude: amplitude,
                     size: size
                 )
-            }) else {
+            }
+            guard var pixelBuffer = maybeBuffer else {
                 throw VideoExportError.renderFrameFailed(frame)
             }
 

@@ -51,60 +51,64 @@ final class AudioAnalyzer: ObservableObject {
     /// - Parameters:
     ///   - url: Path to the audio file.
     ///   - fps: Target frame rate (default 30).
-    nonisolated func analyzeFile(url: URL, fps: Double = 30) async throws {
-        let file = try AVAudioFile(forReading: url)
-        guard let format = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: file.fileFormat.sampleRate,
-            channels: 1,
-            interleaved: false
-        ) else {
-            throw AudioAnalyzerError.invalidFormat
-        }
+    func analyzeFile(url: URL, fps: Double = 30) async throws {
+        // Capture MainActor-isolated values before moving off the main actor.
+        let capturedGain = gain
+        let capturedAlpha = smoothingAlpha
 
-        let totalFrames = AVAudioFrameCount(file.length)
-        guard totalFrames > 0 else {
-            await MainActor.run { amplitudes = [] }
-            return
-        }
+        let result: [Float] = try await Task.detached {
+            let file = try AVAudioFile(forReading: url)
+            guard let format = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: file.fileFormat.sampleRate,
+                channels: 1,
+                interleaved: false
+            ) else {
+                throw AudioAnalyzerError.invalidFormat
+            }
 
-        // Read the entire file into one buffer.
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: totalFrames) else {
-            throw AudioAnalyzerError.bufferAllocationFailed
-        }
-        try file.read(into: buffer)
+            let totalFrames = AVAudioFrameCount(file.length)
+            guard totalFrames > 0 else { return [] }
 
-        guard let channelData = buffer.floatChannelData?[0] else {
-            throw AudioAnalyzerError.noChannelData
-        }
+            guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: totalFrames) else {
+                throw AudioAnalyzerError.bufferAllocationFailed
+            }
+            try file.read(into: buffer)
 
-        let sampleRate = file.fileFormat.sampleRate
-        let samplesPerFrame = Int(sampleRate / fps)
-        guard samplesPerFrame > 0 else {
-            throw AudioAnalyzerError.invalidFrameRate
-        }
+            guard let channelData = buffer.floatChannelData?[0] else {
+                throw AudioAnalyzerError.noChannelData
+            }
 
-        let sampleCount = Int(buffer.frameLength)
-        var result: [Float] = []
-        result.reserveCapacity(sampleCount / samplesPerFrame + 1)
+            let sampleRate = file.fileFormat.sampleRate
+            let samplesPerFrame = Int(sampleRate / fps)
+            guard samplesPerFrame > 0 else {
+                throw AudioAnalyzerError.invalidFrameRate
+            }
 
-        var smoothed: Float = 0
-        var offset = 0
+            let sampleCount = Int(buffer.frameLength)
+            var samples: [Float] = []
+            samples.reserveCapacity(sampleCount / samplesPerFrame + 1)
 
-        while offset < sampleCount {
-            let remaining = sampleCount - offset
-            let count = min(samplesPerFrame, remaining)
+            var smoothed: Float = 0
+            var offset = 0
 
-            let rms = Self.computeRMS(channelData + offset, count: count)
-            let normalized = min(rms * gain, 1.0)
+            while offset < sampleCount {
+                let remaining = sampleCount - offset
+                let count = min(samplesPerFrame, remaining)
 
-            smoothed = smoothingAlpha * normalized + (1 - smoothingAlpha) * smoothed
-            result.append(smoothed)
+                let rms = Self.computeRMS(channelData + offset, count: count)
+                let normalized = min(rms * capturedGain, 1.0)
 
-            offset += samplesPerFrame
-        }
+                smoothed = capturedAlpha * normalized + (1 - capturedAlpha) * smoothed
+                samples.append(smoothed)
 
-        await MainActor.run { amplitudes = result }
+                offset += samplesPerFrame
+            }
+
+            return samples
+        }.value
+
+        amplitudes = result
     }
 
     // MARK: - Live Playback
@@ -188,83 +192,79 @@ final class AudioAnalyzer: ObservableObject {
     ///   - inputURL: The source audio file.
     ///   - pitchShift: Pitch shift in semitones.
     /// - Returns: URL to the rendered output file.
-    nonisolated func renderProcessedAudio(inputURL: URL, pitchShift: Float) async throws -> URL {
-        let sourceFile = try AVAudioFile(forReading: inputURL)
-        let format = sourceFile.processingFormat
-        let sampleRate = format.sampleRate
-        let totalFrames = AVAudioFrameCount(sourceFile.length)
+    func renderProcessedAudio(inputURL: URL, pitchShift: Float) async throws -> URL {
+        try await Task.detached {
+            let sourceFile = try AVAudioFile(forReading: inputURL)
+            let format = sourceFile.processingFormat
+            let sampleRate = format.sampleRate
+            let totalFrames = AVAudioFrameCount(sourceFile.length)
 
-        // Set up offline engine
-        let engine = AVAudioEngine()
-        let player = AVAudioPlayerNode()
-        let timePitch = AVAudioUnitTimePitch()
-        timePitch.pitch = pitchShift * 100
+            let engine = AVAudioEngine()
+            let player = AVAudioPlayerNode()
+            let timePitch = AVAudioUnitTimePitch()
+            timePitch.pitch = pitchShift * 100
 
-        engine.attach(player)
-        engine.attach(timePitch)
-        engine.connect(player, to: timePitch, format: format)
-        engine.connect(timePitch, to: engine.mainMixerNode, format: format)
+            engine.attach(player)
+            engine.attach(timePitch)
+            engine.connect(player, to: timePitch, format: format)
+            engine.connect(timePitch, to: engine.mainMixerNode, format: format)
 
-        try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: 4096)
-        try engine.start()
-        player.play()
+            try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: 4096)
+            try engine.start()
+            player.play()
+            player.scheduleFile(sourceFile, at: nil)
 
-        // Schedule source file
-        player.scheduleFile(sourceFile, at: nil)
+            let outputURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension("m4a")
 
-        // Prepare output file
-        let outputURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension("m4a")
+            let outputSettings: [String: Any] = [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVSampleRateKey: sampleRate,
+                AVNumberOfChannelsKey: format.channelCount,
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            ]
+            let outputFile = try AVAudioFile(
+                forWriting: outputURL,
+                settings: outputSettings,
+                commonFormat: format.commonFormat,
+                interleaved: format.isInterleaved
+            )
 
-        let outputSettings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: sampleRate,
-            AVNumberOfChannelsKey: format.channelCount,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-        ]
-        let outputFile = try AVAudioFile(
-            forWriting: outputURL,
-            settings: outputSettings,
-            commonFormat: format.commonFormat,
-            interleaved: format.isInterleaved
-        )
-
-        // Render in chunks
-        guard let renderBuffer = AVAudioPCMBuffer(pcmFormat: engine.manualRenderingFormat,
-                                                  frameCapacity: engine.manualRenderingMaximumFrameCount) else {
-            throw AudioAnalyzerError.bufferAllocationFailed
-        }
-        var framesRemaining = totalFrames
-        var retryCount = 0
-        let maxRetries = 100
-        while framesRemaining > 0 {
-            let framesToRender = min(engine.manualRenderingMaximumFrameCount, framesRemaining)
-            let status = try engine.renderOffline(framesToRender, to: renderBuffer)
-            switch status {
-            case .success:
-                try outputFile.write(from: renderBuffer)
-                framesRemaining -= renderBuffer.frameLength
-                retryCount = 0
-            case .insufficientDataFromInputNode:
-                // Input exhausted — we're done
-                framesRemaining = 0
-            case .cannotDoInCurrentContext:
-                retryCount += 1
-                if retryCount > maxRetries {
+            guard let renderBuffer = AVAudioPCMBuffer(pcmFormat: engine.manualRenderingFormat,
+                                                      frameCapacity: engine.manualRenderingMaximumFrameCount) else {
+                throw AudioAnalyzerError.bufferAllocationFailed
+            }
+            var framesRemaining = totalFrames
+            var retryCount = 0
+            let maxRetries = 100
+            while framesRemaining > 0 {
+                let framesToRender = min(engine.manualRenderingMaximumFrameCount, framesRemaining)
+                let status = try engine.renderOffline(framesToRender, to: renderBuffer)
+                switch status {
+                case .success:
+                    try outputFile.write(from: renderBuffer)
+                    framesRemaining -= renderBuffer.frameLength
+                    retryCount = 0
+                case .insufficientDataFromInputNode:
+                    framesRemaining = 0
+                case .cannotDoInCurrentContext:
+                    retryCount += 1
+                    if retryCount > maxRetries {
+                        throw AudioAnalyzerError.offlineRenderFailed
+                    }
+                    continue
+                case .error:
+                    throw AudioAnalyzerError.offlineRenderFailed
+                @unknown default:
                     throw AudioAnalyzerError.offlineRenderFailed
                 }
-                continue
-            case .error:
-                throw AudioAnalyzerError.offlineRenderFailed
-            @unknown default:
-                throw AudioAnalyzerError.offlineRenderFailed
             }
-        }
 
-        engine.stop()
-        player.stop()
-        return outputURL
+            engine.stop()
+            player.stop()
+            return outputURL
+        }.value
     }
 
     // MARK: - Helpers
