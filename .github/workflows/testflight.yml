@@ -51,11 +51,10 @@ jobs:
 
       - name: Create distribution certificate and profile
         run: |
-          # Create/fetch distribution certificate
+          # Create/fetch iOS distribution certificate
           fastlane run get_certificates \
             api_key_path:"/tmp/asc_key.json" \
             platform:"ios" \
-            type:"appstore" \
             keychain_path:"$HOME/Library/Keychains/build.keychain" \
             keychain_password:"actions" \
             generate_apple_certs:true
