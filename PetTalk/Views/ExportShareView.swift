@@ -16,6 +16,7 @@ struct ExportShareView: View {
     @State private var showShareSheet: Bool = false
     @State private var savedToCameraRoll: Bool = false
     @State private var showExportOptions: Bool = false
+    @State private var exportAttempted: Bool = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -126,8 +127,9 @@ struct ExportShareView: View {
     // MARK: - Actions
 
     private func startExportIfNeeded() {
-        guard !isExporting, exportedURL == nil else { return }
+        guard !isExporting, exportedURL == nil, !exportAttempted else { return }
         isExporting = true
+        exportAttempted = true
 
         guard let image = project.image,
               let mouthRegion = project.mouthRegion,

@@ -162,6 +162,12 @@ enum VideoExporter {
         // ============================================================
         // Phase 1: Write all video frames
         // ============================================================
+
+        // Create a reusable render context once (SKView + scene + pixel buffer pool).
+        let renderContext = await MainActor.run {
+            MouthAnimatorRenderer.RenderContext(image: image, size: size)
+        }
+
         for frame in 0..<totalFrames {
             // Wait until the input is ready to accept more data.
             while !videoInput.isReadyForMoreMediaData {
@@ -177,14 +183,9 @@ enum VideoExporter {
                 amplitude = amplitudes[index]
             }
 
-            // Render the composited frame on the main thread (SpriteKit requirement).
+            // Render using the reusable context (only updates warp + snapshots).
             let maybeBuffer: CVPixelBuffer? = await MainActor.run {
-                MouthAnimatorRenderer.renderFrame(
-                    image: image,
-                    mouthRegion: mouthRegion,
-                    amplitude: amplitude,
-                    size: size
-                )
+                renderContext.renderFrame(amplitude: amplitude, mouthRegion: mouthRegion)
             }
             guard var pixelBuffer = maybeBuffer else {
                 throw VideoExportError.renderFrameFailed(frame)
@@ -252,7 +253,7 @@ enum VideoExporter {
 
         audioInput.markAsFinished()
 
-        progressHandler(0.95)
+        progressHandler(0.9)
 
         // ============================================================
         // Phase 3: Finalize
@@ -268,6 +269,7 @@ enum VideoExporter {
             throw VideoExportError.finishWritingFailed(message)
         }
 
+        progressHandler(0.95)
         progressHandler(1.0)
 
         return outputURL

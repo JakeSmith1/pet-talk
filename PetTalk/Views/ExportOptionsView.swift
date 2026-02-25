@@ -298,6 +298,7 @@ struct ExportOptionsView: View {
     // MARK: - Actions
 
     private func startExport() {
+        guard !isExporting else { return }
         isExporting = true
         exportProgress = 0
         exportedGIFURL = nil
@@ -308,10 +309,11 @@ struct ExportOptionsView: View {
             do {
                 switch selectedFormat {
                 case .video:
-                    // Handled by the normal ExportShareView flow
-                    isExporting = false
+                    // Handled by the normal ExportShareView flow.
+                    // Dismiss the sheet first, then navigate.
                     onDismiss()
                     project.currentStep = .export
+                    isExporting = false
 
                 case .gif:
                     try await exportGIF()
@@ -342,9 +344,7 @@ struct ExportOptionsView: View {
             amplitudes: project.amplitudes,
             configuration: gifConfig,
             progressHandler: { progress in
-                Task { @MainActor in
-                    exportProgress = progress
-                }
+                exportProgress = progress
             }
         )
 
@@ -366,9 +366,7 @@ struct ExportOptionsView: View {
             style: stickerStyle,
             stickerCount: stickerCount,
             progressHandler: { progress in
-                Task { @MainActor in
-                    exportProgress = progress * 0.8
-                }
+                exportProgress = progress * 0.8
             }
         )
 
@@ -377,9 +375,7 @@ struct ExportOptionsView: View {
         let urls = try StickerPackExporter.exportAsPNGs(
             pack: pack,
             progressHandler: { progress in
-                Task { @MainActor in
-                    exportProgress = 0.8 + progress * 0.2
-                }
+                exportProgress = 0.8 + progress * 0.2
             }
         )
 

@@ -16,6 +16,7 @@ struct DuetExportView: View {
     @State private var showError: Bool = false
     @State private var showShareSheet: Bool = false
     @State private var savedToCameraRoll: Bool = false
+    @State private var exportAttempted: Bool = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -108,8 +109,9 @@ struct DuetExportView: View {
     // MARK: - Actions
 
     private func startExportIfNeeded() {
-        guard !isExporting, exportedURL == nil else { return }
+        guard !isExporting, exportedURL == nil, !exportAttempted else { return }
         isExporting = true
+        exportAttempted = true
         exportProgress = 0
 
         Task {
@@ -118,9 +120,9 @@ struct DuetExportView: View {
                     leftTrack: duetProject.leftTrack,
                     rightTrack: duetProject.rightTrack,
                     progressHandler: { progress in
-                        Task { @MainActor in
-                            exportProgress = progress
-                        }
+                        // DuetVideoExporter.export is @MainActor, so we're
+                        // already on main — assign directly.
+                        exportProgress = progress
                     }
                 )
 

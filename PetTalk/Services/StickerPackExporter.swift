@@ -82,16 +82,18 @@ enum StickerPackExporter {
         // Step 3: Render each key frame and crop to face
         var stickers: [StickerItem] = []
         let renderSize = style.outputSize
+        let fullSize = CGSize(width: image.size.width, height: image.size.height)
+
+        // Reuse a single SKView + scene + pixel buffer pool across all frames.
+        let renderContext = MouthAnimatorRenderer.RenderContext(image: image, size: fullSize)
 
         for (index, frameIndex) in keyFrameIndices.enumerated() {
             let amplitude = amplitudes[frameIndex]
 
-            // Render the animated frame
-            guard let pixelBuffer = MouthAnimatorRenderer.renderFrame(
-                image: image,
-                mouthRegion: mouthRegion,
+            // Render the animated frame using the reusable context.
+            guard let pixelBuffer = renderContext.renderFrame(
                 amplitude: amplitude,
-                size: CGSize(width: image.size.width, height: image.size.height)
+                mouthRegion: mouthRegion
             ) else {
                 continue
             }
@@ -127,6 +129,9 @@ enum StickerPackExporter {
 
             let progress = 0.2 + Double(index + 1) / Double(keyFrameIndices.count) * 0.7
             progressHandler(progress)
+
+            // Yield to let SwiftUI process progress bar updates.
+            await Task.yield()
         }
 
         guard !stickers.isEmpty else {

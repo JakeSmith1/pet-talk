@@ -149,6 +149,10 @@ enum DuetVideoExporter {
         let leftAmplitudes = leftTrack.amplitudes
         let rightAmplitudes = rightTrack.amplitudes
 
+        // Create reusable render contexts — one per panel (SKView + scene + buffer pool).
+        let leftContext = MouthAnimatorRenderer.RenderContext(image: leftImage, size: panelSize)
+        let rightContext = MouthAnimatorRenderer.RenderContext(image: rightImage, size: panelSize)
+
         for frame in 0..<totalFrames {
             while !videoInput.isReadyForMoreMediaData {
                 try await Task.sleep(nanoseconds: 10_000_000)
@@ -169,21 +173,17 @@ enum DuetVideoExporter {
                 rightAmplitude = rightAmplitudes[min(frame, rightAmplitudes.count - 1)]
             }
 
-            // Render both panels
-            guard let leftBuffer = MouthAnimatorRenderer.renderFrame(
-                image: leftImage,
-                mouthRegion: leftMouth,
+            // Render both panels using reusable contexts.
+            guard let leftBuffer = leftContext.renderFrame(
                 amplitude: leftAmplitude,
-                size: panelSize
+                mouthRegion: leftMouth
             ) else {
                 throw DuetExportError.renderFrameFailed("left", frame)
             }
 
-            guard let rightBuffer = MouthAnimatorRenderer.renderFrame(
-                image: rightImage,
-                mouthRegion: rightMouth,
+            guard let rightBuffer = rightContext.renderFrame(
                 amplitude: rightAmplitude,
-                size: panelSize
+                mouthRegion: rightMouth
             ) else {
                 throw DuetExportError.renderFrameFailed("right", frame)
             }
@@ -217,15 +217,20 @@ enum DuetVideoExporter {
             leftAudioURL: leftAudioURL,
             rightAudioURL: rightAudioURL,
             audioInput: audioInput,
-            duration: duration
+            duration: duration,
+            progressHandler: { audioProgress in
+                // Map audio progress (0...1) to overall progress (0.7...0.9).
+                progressHandler(0.7 + audioProgress * 0.2)
+            }
         )
 
         audioInput.markAsFinished()
-        progressHandler(0.9)
 
         // ============================================================
         // Phase 3: Finalize
         // ============================================================
+        progressHandler(0.9)
+
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             writer.finishWriting {
                 continuation.resume()
@@ -237,6 +242,7 @@ enum DuetVideoExporter {
             throw DuetExportError.finishWritingFailed(message)
         }
 
+        progressHandler(0.95)
         progressHandler(1.0)
         return outputURL
     }
@@ -330,7 +336,8 @@ enum DuetVideoExporter {
         leftAudioURL: URL,
         rightAudioURL: URL,
         audioInput: AVAssetWriterInput,
-        duration: Double
+        duration: Double,
+        progressHandler: @escaping (Double) -> Void = { _ in }
     ) async throws {
         // Create a composition with both audio tracks
         let composition = AVMutableComposition()
@@ -406,6 +413,9 @@ enum DuetVideoExporter {
             throw DuetExportError.audioMixFailed
         }
 
+        let totalDuration = CMTime(seconds: duration, preferredTimescale: 44100)
+        let totalSeconds = CMTimeGetSeconds(totalDuration)
+
         while reader.status == .reading {
             while !audioInput.isReadyForMoreMediaData {
                 try await Task.sleep(nanoseconds: 10_000_000)
@@ -415,10 +425,18 @@ enum DuetVideoExporter {
                 if !audioInput.append(sampleBuffer) {
                     break
                 }
+                // Report audio progress based on presentation timestamp.
+                let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                let currentSeconds = CMTimeGetSeconds(pts)
+                if totalSeconds > 0 {
+                    let audioProgress = min(currentSeconds / totalSeconds, 1.0)
+                    progressHandler(audioProgress)
+                }
             } else {
                 break
             }
         }
+        progressHandler(1.0)
     }
 
     // MARK: - Helpers

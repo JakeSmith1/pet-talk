@@ -82,11 +82,13 @@ struct ContentView: View {
                                 } label: {
                                     Image(systemName: "square.and.arrow.down")
                                 }
+                                .disabled(project.currentStep == .export)
                             }
 
                             Button("Start Over") {
                                 project.reset()
                             }
+                            .disabled(project.currentStep == .export)
                         }
                     }
                 }
@@ -153,6 +155,7 @@ struct ContentView: View {
                 Button("Start Over") {
                     duetProject.reset()
                 }
+                .disabled(duetProject.currentStep == .export)
             }
         }
     }

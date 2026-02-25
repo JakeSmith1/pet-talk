@@ -177,25 +177,30 @@ enum GIFExporter {
         var frames: [UIImage] = []
         frames.reserveCapacity(totalFrames)
 
-        // Use generateCGImagesAsynchronously for frame extraction
+        // Use generateCGImagesAsynchronously for frame extraction.
+        // The callback can fire on any thread, so we protect mutable state
+        // with a serial DispatchQueue to avoid a data race.
         let extractedFrames = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<[UIImage], Error>) in
+            let queue = DispatchQueue(label: "com.pettalk.gif-frame-collector")
             var collectedFrames: [UIImage] = []
             var collectedCount = 0
 
             generator.generateCGImagesAsynchronously(forTimes: times) { requestedTime, cgImage, actualTime, result, error in
-                collectedCount += 1
+                queue.sync {
+                    collectedCount += 1
 
-                if let cgImage = cgImage {
-                    collectedFrames.append(UIImage(cgImage: cgImage))
-                }
+                    if let cgImage = cgImage {
+                        collectedFrames.append(UIImage(cgImage: cgImage))
+                    }
 
-                let progress = Double(collectedCount) / Double(totalFrames) * 0.5
-                Task { @MainActor in
-                    progressHandler(progress)
-                }
+                    let progress = Double(collectedCount) / Double(totalFrames) * 0.5
+                    Task { @MainActor in
+                        progressHandler(progress)
+                    }
 
-                if collectedCount == totalFrames {
-                    continuation.resume(returning: collectedFrames)
+                    if collectedCount == totalFrames {
+                        continuation.resume(returning: collectedFrames)
+                    }
                 }
             }
         }
@@ -251,12 +256,13 @@ enum GIFExporter {
         var frames: [UIImage] = []
         frames.reserveCapacity(sampledAmplitudes.count)
 
+        // Reuse a single SKView + scene + pixel buffer pool across all frames.
+        let renderContext = MouthAnimatorRenderer.RenderContext(image: image, size: renderSize)
+
         for (index, amplitude) in sampledAmplitudes.enumerated() {
-            guard let pixelBuffer = MouthAnimatorRenderer.renderFrame(
-                image: image,
-                mouthRegion: mouthRegion,
+            guard let pixelBuffer = renderContext.renderFrame(
                 amplitude: amplitude,
-                size: renderSize
+                mouthRegion: mouthRegion
             ) else {
                 throw GIFExportError.failedToCreateImageFromFrame
             }
@@ -267,6 +273,9 @@ enum GIFExporter {
 
             let progress = Double(index + 1) / Double(sampledAmplitudes.count) * 0.7
             progressHandler(progress)
+
+            // Yield to let SwiftUI process progress bar updates.
+            await Task.yield()
         }
 
         let gifURL = try await exportGIF(
