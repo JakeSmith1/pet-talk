@@ -88,6 +88,12 @@ jobs:
             platform:"ios" \
             force:true
 
+          # Extract profile UUID from installed profile
+          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          PROFILE_UUID=$(security cms -D -i "$PROFILE_PATH" 2>/dev/null | plutil -extract UUID raw -)
+          echo "Profile UUID: $PROFILE_UUID"
+          echo "PROFILE_UUID=$PROFILE_UUID" >> $GITHUB_ENV
+
       - name: Build and export IPA
         run: |
           fastlane run build_app \
@@ -98,7 +104,7 @@ jobs:
             codesigning_identity:"Apple Distribution" \
             output_directory:"build" \
             output_name:"PetTalk.ipa" \
-            xcargs:"CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=WUP45X339T -destination 'generic/platform=iOS'"
+            xcargs:"CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=WUP45X339T PROVISIONING_PROFILE=$PROFILE_UUID -destination 'generic/platform=iOS'"
 
       - name: Upload to TestFlight
         run: |
