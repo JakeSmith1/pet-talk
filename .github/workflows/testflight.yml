@@ -95,21 +95,58 @@ jobs:
           echo "Profile UUID: $PROFILE_UUID"
           echo "PROFILE_UUID=$PROFILE_UUID" >> $GITHUB_ENV
 
-      - name: Build and export IPA
+      - name: Archive
         run: |
-          fastlane run build_app \
-            project:"PetTalk.xcodeproj" \
-            scheme:"PetTalk" \
-            clean:true \
-            export_method:"app-store" \
-            codesigning_identity:"Apple Distribution" \
-            output_directory:"build" \
-            output_name:"PetTalk.ipa" \
-            xcargs:"CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=WUP45X339T PROVISIONING_PROFILE=$PROFILE_UUID -destination 'generic/platform=iOS'"
+          xcodebuild archive \
+            -project PetTalk.xcodeproj \
+            -scheme PetTalk \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/PetTalk.xcarchive \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=WUP45X339T \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE="$PROFILE_UUID"
+
+      - name: Export IPA
+        run: |
+          # Generate ExportOptions.plist with the correct profile UUID
+          cat > /tmp/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>teamID</key>
+              <string>WUP45X339T</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.pettalk.app</key>
+                  <string>$PROFILE_UUID</string>
+              </dict>
+              <key>signingCertificate</key>
+              <string>Apple Distribution</string>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>uploadSymbols</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild -exportArchive \
+            -archivePath build/PetTalk.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist /tmp/ExportOptions.plist
+
+          echo "Exported IPA:"
+          ls -lh build/export/*.ipa
 
       - name: Upload to TestFlight
         run: |
           fastlane run upload_to_testflight \
-            ipa:"build/PetTalk.ipa" \
+            ipa:"build/export/PetTalk.ipa" \
             api_key_path:"/tmp/asc_key.json" \
             skip_waiting_for_build_processing:true
