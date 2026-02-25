@@ -39,6 +39,8 @@
     </array>
     <key>CFBundleIconName</key>
     <string>AppIcon</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
