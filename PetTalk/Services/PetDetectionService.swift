@@ -75,21 +75,48 @@ enum PetDetectionService {
             throw PetDetectionError.noPoseDetected
         }
 
-        // Attempt to extract the nose joint from the head group.
-        let nosePoint = try firstResult.recognizedPoint(.nose)
+        // Collect all confident head joints (nose + ears) to locate the head.
+        let nosePoint = try? firstResult.recognizedPoint(.nose)
+        let leftEar = try? firstResult.recognizedPoint(.leftEar)
+        let rightEar = try? firstResult.recognizedPoint(.rightEar)
 
-        guard nosePoint.confidence > 0.1 else {
-            throw PetDetectionError.noPoseDetected
+        let confidentNose = nosePoint.flatMap { $0.confidence > 0.3 ? $0 : nil }
+        let confidentLeftEar = leftEar.flatMap { $0.confidence > 0.3 ? $0 : nil }
+        let confidentRightEar = rightEar.flatMap { $0.confidence > 0.3 ? $0 : nil }
+
+        // Strategy 1: High-confidence nose, validated against ears when available.
+        if let nose = confidentNose {
+            // If we also have an ear, verify the nose is near the head (not a misdetected limb).
+            if let ear = confidentLeftEar ?? confidentRightEar {
+                let dist = hypot(nose.location.x - ear.location.x, nose.location.y - ear.location.y)
+                // Nose and ear should be within ~30% of image size of each other.
+                if dist > 0.3 {
+                    throw PetDetectionError.noPoseDetected
+                }
+            }
+
+            let mouthCenter = CGPoint(
+                x: nose.location.x,
+                y: nose.location.y - noseToMouthOffset
+            ).clamped()
+            return MouthRegion(center: mouthCenter, radius: defaultMouthRadius)
         }
 
-        // Vision coordinates have origin at bottom-left; moving "down" toward the mouth
-        // means *decreasing* y.
-        let mouthCenter = CGPoint(
-            x: nosePoint.location.x,
-            y: nosePoint.location.y - noseToMouthOffset
-        ).clamped()
+        // Strategy 2: No confident nose, but we have ear(s) — estimate mouth from ear midpoint.
+        let ears = [confidentLeftEar, confidentRightEar].compactMap { $0 }
+        if !ears.isEmpty {
+            let earCenterX = ears.map(\.location.x).reduce(0, +) / CGFloat(ears.count)
+            let earCenterY = ears.map(\.location.y).reduce(0, +) / CGFloat(ears.count)
 
-        return MouthRegion(center: mouthCenter, radius: defaultMouthRadius)
+            // Mouth is below and roughly centered between the ears.
+            let mouthCenter = CGPoint(
+                x: earCenterX,
+                y: earCenterY - noseToMouthOffset * 2
+            ).clamped()
+            return MouthRegion(center: mouthCenter, radius: defaultMouthRadius)
+        }
+
+        throw PetDetectionError.noPoseDetected
     }
 
     // MARK: - Bounding Box Fallback
@@ -115,11 +142,11 @@ enum PetDetectionService {
 
         let box = firstResult.boundingBox
 
-        // Place the mouth at the horizontal center, roughly 20% up from the bottom of the
-        // bounding box (lower-center of the face).
+        // Place the mouth at the horizontal center, roughly 65% up from the bottom of the
+        // bounding box (upper portion where the head typically is for standing/sitting pets).
         let mouthCenter = CGPoint(
             x: box.midX,
-            y: box.minY + box.height * 0.20
+            y: box.minY + box.height * 0.65
         ).clamped()
 
         let radius = min(box.width, box.height) * 0.15

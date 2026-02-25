@@ -132,7 +132,8 @@ struct MouthRegionEditorView: View {
                     y: displayCenter.y
                 )
         }
-        .gesture(dragGesture.simultaneously(with: pinchGesture))
+        .gesture(dragGesture)
+        .gesture(pinchGesture)
     }
 
     private var instructionText: some View {
