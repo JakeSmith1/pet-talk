@@ -77,8 +77,8 @@ enum PetDetectionService {
 
         // Collect all confident head joints (nose + ears) to locate the head.
         let nosePoint = try? firstResult.recognizedPoint(.nose)
-        let leftEar = try? firstResult.recognizedPoint(.leftEar)
-        let rightEar = try? firstResult.recognizedPoint(.rightEar)
+        let leftEar = try? firstResult.recognizedPoint(.leftEarMiddle)
+        let rightEar = try? firstResult.recognizedPoint(.rightEarMiddle)
 
         let confidentNose = nosePoint.flatMap { $0.confidence > 0.3 ? $0 : nil }
         let confidentLeftEar = leftEar.flatMap { $0.confidence > 0.3 ? $0 : nil }
@@ -105,8 +105,8 @@ enum PetDetectionService {
         // Strategy 2: No confident nose, but we have ear(s) — estimate mouth from ear midpoint.
         let ears = [confidentLeftEar, confidentRightEar].compactMap { $0 }
         if !ears.isEmpty {
-            let earCenterX = ears.map(\.location.x).reduce(0, +) / CGFloat(ears.count)
-            let earCenterY = ears.map(\.location.y).reduce(0, +) / CGFloat(ears.count)
+            let earCenterX = ears.map { $0.location.x }.reduce(0, +) / CGFloat(ears.count)
+            let earCenterY = ears.map { $0.location.y }.reduce(0, +) / CGFloat(ears.count)
 
             // Mouth is below and roughly centered between the ears.
             let mouthCenter = CGPoint(
