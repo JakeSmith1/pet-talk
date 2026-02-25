@@ -52,27 +52,18 @@ jobs:
             CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM=WUP45X339T
 
-      - name: Export and Upload
+      - name: Create IPA from archive
         run: |
-          xcodebuild -exportArchive \
-            -archivePath build/PetTalk.xcarchive \
-            -exportPath build/export \
-            -exportOptionsPlist ExportOptions.plist \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8 \
-            -authenticationKeyID ${{ secrets.ASC_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.ASC_KEY_ISSUER_ID }} \
-            DEVELOPMENT_TEAM=WUP45X339T
+          # Create IPA manually from the signed archive
+          mkdir -p build/Payload
+          cp -r build/PetTalk.xcarchive/Products/Applications/PetTalk.app build/Payload/
+          cd build && zip -r PetTalk.ipa Payload
+          echo "IPA created: $(ls -lh PetTalk.ipa)"
 
-      - name: Upload to TestFlight (fallback)
-        if: failure()
+      - name: Upload to TestFlight
         run: |
-          # If exportArchive with upload fails, try manual upload
-          IPA=$(find build/export -name "*.ipa" | head -1)
-          if [ -n "$IPA" ]; then
-            xcrun altool --upload-app \
-              --type ios \
-              --file "$IPA" \
-              --apiKey ${{ secrets.ASC_KEY_ID }} \
-              --apiIssuer ${{ secrets.ASC_KEY_ISSUER_ID }}
-          fi
+          xcrun altool --upload-app \
+            --type ios \
+            --file build/PetTalk.ipa \
+            --apiKey ${{ secrets.ASC_KEY_ID }} \
+            --apiIssuer ${{ secrets.ASC_KEY_ISSUER_ID }}
