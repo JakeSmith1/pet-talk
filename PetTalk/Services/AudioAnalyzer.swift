@@ -270,7 +270,7 @@ final class AudioAnalyzer: ObservableObject {
     // MARK: - Helpers
 
     /// Computes the RMS (root mean square) of a float buffer.
-    private static func computeRMS(_ data: UnsafePointer<Float>, count: Int) -> Float {
+    nonisolated private static func computeRMS(_ data: UnsafePointer<Float>, count: Int) -> Float {
         guard count > 0 else { return 0 }
         var sumOfSquares: Float = 0
         vDSP_measqv(data, 1, &sumOfSquares, vDSP_Length(count))
