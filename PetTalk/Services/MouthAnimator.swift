@@ -311,6 +311,10 @@ enum MouthAnimatorRenderer {
         private let bufferPool: CVPixelBufferPool?
         private let size: CGSize
 
+        deinit {
+            skView.presentScene(nil)
+        }
+
         /// Creates a render context that can be reused for every frame of an export.
         ///
         /// - Parameters:

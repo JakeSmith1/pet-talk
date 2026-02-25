@@ -185,11 +185,15 @@ enum GIFExporter {
             var collectedFrames: [UIImage] = []
             var collectedCount = 0
 
+            var resumed = false
+
             generator.generateCGImagesAsynchronously(forTimes: times) { requestedTime, cgImage, actualTime, result, error in
                 queue.sync {
+                    guard !resumed else { return }
+
                     collectedCount += 1
 
-                    if let cgImage = cgImage {
+                    if result == .succeeded, let cgImage = cgImage {
                         collectedFrames.append(UIImage(cgImage: cgImage))
                     }
 
@@ -198,7 +202,9 @@ enum GIFExporter {
                         progressHandler(progress)
                     }
 
-                    if collectedCount == totalFrames {
+                    // Resume when all frames are delivered, or if generator was cancelled.
+                    if collectedCount == totalFrames || result == .cancelled {
+                        resumed = true
                         continuation.resume(returning: collectedFrames)
                     }
                 }

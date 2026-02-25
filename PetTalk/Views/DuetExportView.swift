@@ -120,9 +120,9 @@ struct DuetExportView: View {
                     leftTrack: duetProject.leftTrack,
                     rightTrack: duetProject.rightTrack,
                     progressHandler: { progress in
-                        // DuetVideoExporter.export is @MainActor, so we're
-                        // already on main — assign directly.
-                        exportProgress = progress
+                        Task { @MainActor in
+                            exportProgress = progress
+                        }
                     }
                 )
 
@@ -135,6 +135,7 @@ struct DuetExportView: View {
             } catch {
                 await MainActor.run {
                     isExporting = false
+                    exportAttempted = false // Allow retry after failure.
                     errorMessage = error.localizedDescription
                     showError = true
                 }

@@ -159,6 +159,15 @@ enum VideoExporter {
         }
         writer.startSession(atSourceTime: .zero)
 
+        // Clean up the writer and temp file if export fails partway through.
+        var writerFinished = false
+        defer {
+            if !writerFinished {
+                writer.cancelWriting()
+                try? FileManager.default.removeItem(at: outputURL)
+            }
+        }
+
         // ============================================================
         // Phase 1: Write all video frames
         // ============================================================
@@ -245,6 +254,13 @@ enum VideoExporter {
                 if !audioInput.append(sampleBuffer) {
                     break
                 }
+                // Report audio progress based on presentation timestamp.
+                let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                if pts.isValid, durationSeconds > 0 {
+                    let audioProgress = min(CMTimeGetSeconds(pts) / durationSeconds, 1.0)
+                    // Map audio progress (0...1) to overall progress (0.8...0.9).
+                    progressHandler(0.8 + audioProgress * 0.1)
+                }
             } else {
                 // No more samples to read.
                 break
@@ -269,6 +285,7 @@ enum VideoExporter {
             throw VideoExportError.finishWritingFailed(message)
         }
 
+        writerFinished = true
         progressHandler(0.95)
         progressHandler(1.0)
 

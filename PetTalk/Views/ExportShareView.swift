@@ -188,6 +188,7 @@ struct ExportShareView: View {
             } catch {
                 await MainActor.run {
                     isExporting = false
+                    exportAttempted = false // Allow retry after failure.
                     errorMessage = error.localizedDescription
                     showError = true
                 }

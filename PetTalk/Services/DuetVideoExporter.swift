@@ -143,6 +143,15 @@ enum DuetVideoExporter {
         }
         writer.startSession(atSourceTime: .zero)
 
+        // Clean up the writer and temp file if export fails partway through.
+        var writerFinished = false
+        defer {
+            if !writerFinished {
+                writer.cancelWriting()
+                try? FileManager.default.removeItem(at: outputURL)
+            }
+        }
+
         // ============================================================
         // Phase 1: Write all video frames (side-by-side composition)
         // ============================================================
@@ -242,6 +251,7 @@ enum DuetVideoExporter {
             throw DuetExportError.finishWritingFailed(message)
         }
 
+        writerFinished = true
         progressHandler(0.95)
         progressHandler(1.0)
         return outputURL
@@ -413,9 +423,6 @@ enum DuetVideoExporter {
             throw DuetExportError.audioMixFailed
         }
 
-        let totalDuration = CMTime(seconds: duration, preferredTimescale: 44100)
-        let totalSeconds = CMTimeGetSeconds(totalDuration)
-
         while reader.status == .reading {
             while !audioInput.isReadyForMoreMediaData {
                 try await Task.sleep(nanoseconds: 10_000_000)
@@ -427,9 +434,9 @@ enum DuetVideoExporter {
                 }
                 // Report audio progress based on presentation timestamp.
                 let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-                let currentSeconds = CMTimeGetSeconds(pts)
-                if totalSeconds > 0 {
-                    let audioProgress = min(currentSeconds / totalSeconds, 1.0)
+                if pts.isValid, duration > 0 {
+                    let currentSeconds = CMTimeGetSeconds(pts)
+                    let audioProgress = min(max(currentSeconds / duration, 0.0), 1.0)
                     progressHandler(audioProgress)
                 }
             } else {
