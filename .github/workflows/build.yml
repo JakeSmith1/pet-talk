@@ -36,7 +36,7 @@ jobs:
           xcodebuild build \
             -project PetTalk.xcodeproj \
             -scheme PetTalk \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
