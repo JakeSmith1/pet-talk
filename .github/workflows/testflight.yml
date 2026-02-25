@@ -32,14 +32,22 @@ jobs:
         run: gem install fastlane
 
       - name: Write ASC API key JSON
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_ISSUER_ID: ${{ secrets.ASC_KEY_ISSUER_ID }}
         run: |
-          cat > /tmp/asc_key.json <<KEYEOF
-          {
-            "key_id": "${{ secrets.ASC_KEY_ID }}",
-            "issuer_id": "${{ secrets.ASC_KEY_ISSUER_ID }}",
-            "key": "${{ secrets.ASC_KEY_P8 }}"
+          python3 -c "
+          import json, os
+          data = {
+              'key_id': os.environ['ASC_KEY_ID'],
+              'issuer_id': os.environ['ASC_KEY_ISSUER_ID'],
+              'key': os.environ['ASC_KEY_P8']
           }
-          KEYEOF
+          with open('/tmp/asc_key.json', 'w') as f:
+              json.dump(data, f)
+          print('API key JSON written successfully')
+          "
 
       - name: Create temporary keychain
         run: |
