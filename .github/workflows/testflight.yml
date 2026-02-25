@@ -95,9 +95,11 @@ jobs:
             scheme:"PetTalk" \
             clean:true \
             export_method:"app-store" \
+            codesigning_identity:"Apple Distribution" \
             output_directory:"build" \
             output_name:"PetTalk.ipa" \
-            destination:"generic/platform=iOS"
+            destination:"generic/platform=iOS" \
+            xcargs:"CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=WUP45X339T"
 
       - name: Upload to TestFlight
         run: |
