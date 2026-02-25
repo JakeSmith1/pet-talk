@@ -2,9 +2,27 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var project: PetTalkProject
+    @EnvironmentObject var duetProject: DuetProject
+    @StateObject private var projectStore = ProjectStore()
+    @State private var showSettings = false
+    @State private var showProjectList = false
+    @State private var showSaveSheet = false
+    @State private var isDuetMode = false
 
     var body: some View {
         NavigationStack {
+            if isDuetMode {
+                duetContent
+            } else {
+                soloContent
+            }
+        }
+    }
+
+    // MARK: - Solo Mode Content
+
+    private var soloContent: some View {
+        Group {
             TabView(selection: $project.currentStep) {
                 PhotoPickerView()
                     .tag(PetTalkProject.Step.pickPhoto)
@@ -31,15 +49,58 @@ struct ContentView: View {
                                 project.currentStep = prev
                             }
                         }
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    if project.currentStep != .pickPhoto {
-                        Button("Start Over") {
-                            project.reset()
+                    } else {
+                        HStack(spacing: 12) {
+                            Button {
+                                showSettings = true
+                            } label: {
+                                Image(systemName: "gearshape")
+                            }
+
+                            Button {
+                                showProjectList = true
+                            } label: {
+                                Image(systemName: "folder")
+                            }
+
+                            Button {
+                                isDuetMode = true
+                            } label: {
+                                Image(systemName: "person.2.fill")
+                            }
+                            .accessibilityLabel("Duet Mode")
                         }
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 12) {
+                        if project.currentStep != .pickPhoto {
+                            // Save project button (available when we have image + audio).
+                            if project.image != nil && project.audioURL != nil {
+                                Button {
+                                    showSaveSheet = true
+                                } label: {
+                                    Image(systemName: "square.and.arrow.down")
+                                }
+                            }
+
+                            Button("Start Over") {
+                                project.reset()
+                            }
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+            }
+            .sheet(isPresented: $showProjectList) {
+                ProjectListView(store: projectStore)
+                    .environmentObject(project)
+            }
+            .sheet(isPresented: $showSaveSheet) {
+                SaveProjectSheet(store: projectStore)
+                    .environmentObject(project)
             }
         }
     }
@@ -51,5 +112,52 @@ struct ContentView: View {
         case .preview: return "Preview"
         case .export: return "Export & Share"
         }
+    }
+
+    // MARK: - Duet Mode Content
+
+    private var duetContent: some View {
+        Group {
+            switch duetProject.currentStep {
+            case .setupLeft, .setupRight:
+                DuetSetupView()
+                    .environmentObject(duetProject)
+            case .preview:
+                DuetPreviewView()
+                    .environmentObject(duetProject)
+            case .export:
+                DuetExportView()
+                    .environmentObject(duetProject)
+            }
+        }
+        .navigationTitle(duetNavigationTitle)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                if duetProject.currentStep != .setupLeft {
+                    Button("Back") {
+                        let raw = duetProject.currentStep.rawValue
+                        if raw > 0, let prev = DuetStep(rawValue: raw - 1) {
+                            duetProject.currentStep = prev
+                        }
+                    }
+                } else {
+                    Button {
+                        isDuetMode = false
+                    } label: {
+                        Label("Solo Mode", systemImage: "person.fill")
+                    }
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Start Over") {
+                    duetProject.reset()
+                }
+            }
+        }
+    }
+
+    private var duetNavigationTitle: String {
+        duetProject.currentStep.title
     }
 }
