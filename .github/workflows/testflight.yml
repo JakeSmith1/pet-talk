@@ -105,7 +105,8 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=WUP45X339T \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE="$PROFILE_UUID"
+            PROVISIONING_PROFILE="$PROFILE_UUID" \
+            ENABLE_PREVIEWS=NO
 
       - name: Export IPA
         run: |
