@@ -50,8 +50,12 @@ jobs:
           print('API key JSON written successfully')
           "
 
-      - name: Create temporary keychain
+      - name: Set up keychain and import certificate
+        env:
+          DIST_CERT_P12: ${{ secrets.DIST_CERT_P12 }}
+          DIST_CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
         run: |
+          # Create temporary keychain
           KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain-db
           security create-keychain -p "actions" $KEYCHAIN_PATH
           security default-keychain -s $KEYCHAIN_PATH
@@ -60,30 +64,32 @@ jobs:
           security list-keychains -d user -s $KEYCHAIN_PATH
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
 
-      - name: Create distribution certificate and profile
-        run: |
-          # Create/fetch iOS distribution certificate
-          fastlane run get_certificates \
-            api_key_path:"/tmp/asc_key.json" \
-            platform:"ios" \
-            keychain_path:"$KEYCHAIN_PATH" \
-            keychain_password:"actions" \
-            generate_apple_certs:true
+          # Install Apple WWDR intermediate certificate (required for distribution)
+          curl -sL https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer -o /tmp/AppleWWDRCAG3.cer
+          security import /tmp/AppleWWDRCAG3.cer -k $KEYCHAIN_PATH -T /usr/bin/codesign
 
-          # Create/fetch App Store distribution provisioning profile
+          # Decode and import distribution certificate .p12
+          echo "$DIST_CERT_P12" | base64 -D > /tmp/dist.p12
+          security import /tmp/dist.p12 -k $KEYCHAIN_PATH -P "$DIST_CERT_PASSWORD" -T /usr/bin/codesign
+          rm /tmp/dist.p12
+
+          # Allow codesign to access keychain without prompts
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "actions" $KEYCHAIN_PATH
+
+          # Verify certificate is installed
+          echo "Installed signing identities:"
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
+
+      - name: Fetch provisioning profile
+        run: |
           fastlane run get_provisioning_profile \
             api_key_path:"/tmp/asc_key.json" \
             app_identifier:"com.pettalk.app" \
             platform:"ios" \
             force:true
 
-          # Extract profile name for later use
-          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
-          echo "Profile installed at: $PROFILE_PATH"
-
       - name: Build and export IPA
         run: |
-          # Use fastlane gym which handles archive + export + signing
           fastlane run build_app \
             project:"PetTalk.xcodeproj" \
             scheme:"PetTalk" \
