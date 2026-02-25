@@ -98,8 +98,7 @@ jobs:
             codesigning_identity:"Apple Distribution" \
             output_directory:"build" \
             output_name:"PetTalk.ipa" \
-            destination:"generic/platform=iOS" \
-            xcargs:"CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=WUP45X339T"
+            xcargs:"CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=WUP45X339T -destination 'generic/platform=iOS'"
 
       - name: Upload to TestFlight
         run: |
