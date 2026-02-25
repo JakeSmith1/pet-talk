@@ -70,12 +70,12 @@ jobs:
             keychain_password:"actions" \
             generate_apple_certs:true
 
-          # Create/fetch distribution provisioning profile
+          # Create/fetch App Store distribution provisioning profile
+          # (no adhoc/development flag = App Store type by default)
           fastlane run get_provisioning_profile \
             api_key_path:"/tmp/asc_key.json" \
             app_identifier:"com.pettalk.app" \
             platform:"ios" \
-            type:"appstore" \
             force:true
 
       - name: Archive
