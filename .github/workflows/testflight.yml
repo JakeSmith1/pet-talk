@@ -71,68 +71,31 @@ jobs:
             generate_apple_certs:true
 
           # Create/fetch App Store distribution provisioning profile
-          # (no adhoc/development flag = App Store type by default)
           fastlane run get_provisioning_profile \
             api_key_path:"/tmp/asc_key.json" \
             app_identifier:"com.pettalk.app" \
             platform:"ios" \
             force:true
 
-      - name: Archive
-        run: |
-          # Find the provisioning profile UUID
+          # Extract profile name for later use
           PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
-          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
-          echo "Using profile: $PROFILE_UUID"
+          echo "Profile installed at: $PROFILE_PATH"
 
-          xcodebuild archive \
-            -project PetTalk.xcodeproj \
-            -scheme PetTalk \
-            -destination 'generic/platform=iOS' \
-            -archivePath build/PetTalk.xcarchive \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM=WUP45X339T \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID"
-
-      - name: Export IPA
+      - name: Build and export IPA
         run: |
-          # Find provisioning profile UUID for ExportOptions
-          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
-          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
-
-          # Create export options with manual signing
-          cat > /tmp/ExportOptions.plist <<PLISTEOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>app-store-connect</string>
-              <key>teamID</key>
-              <string>WUP45X339T</string>
-              <key>signingStyle</key>
-              <string>manual</string>
-              <key>provisioningProfiles</key>
-              <dict>
-                  <key>com.pettalk.app</key>
-                  <string>${PROFILE_UUID}</string>
-              </dict>
-              <key>uploadBitcode</key>
-              <false/>
-              <key>uploadSymbols</key>
-              <true/>
-          </dict>
-          </plist>
-          PLISTEOF
-
-          xcodebuild -exportArchive \
-            -archivePath build/PetTalk.xcarchive \
-            -exportPath build/export \
-            -exportOptionsPlist /tmp/ExportOptions.plist
+          # Use fastlane gym which handles archive + export + signing
+          fastlane run build_app \
+            project:"PetTalk.xcodeproj" \
+            scheme:"PetTalk" \
+            clean:true \
+            export_method:"app-store" \
+            output_directory:"build" \
+            output_name:"PetTalk.ipa" \
+            destination:"generic/platform=iOS"
 
       - name: Upload to TestFlight
         run: |
           fastlane run upload_to_testflight \
-            ipa:"build/export/PetTalk.ipa" \
+            ipa:"build/PetTalk.ipa" \
             api_key_path:"/tmp/asc_key.json" \
             skip_waiting_for_build_processing:true
