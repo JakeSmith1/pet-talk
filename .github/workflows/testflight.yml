@@ -13,7 +13,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -28,42 +28,101 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Write App Store Connect API key
-        env:
-          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      - name: Install Fastlane
+        run: gem install fastlane
+
+      - name: Write ASC API key JSON
         run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo "$ASC_KEY_P8" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
-          mkdir -p ~/private_keys
-          cp ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 ~/private_keys/
+          cat > /tmp/asc_key.json <<KEYEOF
+          {
+            "key_id": "${{ secrets.ASC_KEY_ID }}",
+            "issuer_id": "${{ secrets.ASC_KEY_ISSUER_ID }}",
+            "key": "${{ secrets.ASC_KEY_P8 }}"
+          }
+          KEYEOF
+
+      - name: Create temporary keychain
+        run: |
+          security create-keychain -p "actions" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "actions" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security list-keychains -d user -s build.keychain
+
+      - name: Create distribution certificate and profile
+        run: |
+          # Create/fetch distribution certificate
+          fastlane run get_certificates \
+            api_key_path:"/tmp/asc_key.json" \
+            platform:"ios" \
+            type:"appstore" \
+            keychain_path:"$HOME/Library/Keychains/build.keychain" \
+            keychain_password:"actions" \
+            generate_apple_certs:true
+
+          # Create/fetch distribution provisioning profile
+          fastlane run get_provisioning_profile \
+            api_key_path:"/tmp/asc_key.json" \
+            app_identifier:"com.pettalk.app" \
+            platform:"ios" \
+            type:"appstore" \
+            force:true
 
       - name: Archive
         run: |
+          # Find the provisioning profile UUID
+          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
+          echo "Using profile: $PROFILE_UUID"
+
           xcodebuild archive \
             -project PetTalk.xcodeproj \
             -scheme PetTalk \
             -destination 'generic/platform=iOS' \
             -archivePath build/PetTalk.xcarchive \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8 \
-            -authenticationKeyID ${{ secrets.ASC_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.ASC_KEY_ISSUER_ID }} \
-            CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM=WUP45X339T
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=WUP45X339T \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID"
 
-      - name: Create IPA from archive
+      - name: Export IPA
         run: |
-          # Create IPA manually from the signed archive
-          mkdir -p build/Payload
-          cp -r build/PetTalk.xcarchive/Products/Applications/PetTalk.app build/Payload/
-          cd build && zip -r PetTalk.ipa Payload
-          echo "IPA created: $(ls -lh PetTalk.ipa)"
+          # Find provisioning profile UUID for ExportOptions
+          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
+
+          # Create export options with manual signing
+          cat > /tmp/ExportOptions.plist <<PLISTEOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>teamID</key>
+              <string>WUP45X339T</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.pettalk.app</key>
+                  <string>${PROFILE_UUID}</string>
+              </dict>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>uploadSymbols</key>
+              <true/>
+          </dict>
+          </plist>
+          PLISTEOF
+
+          xcodebuild -exportArchive \
+            -archivePath build/PetTalk.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist /tmp/ExportOptions.plist
 
       - name: Upload to TestFlight
         run: |
-          xcrun altool --upload-app \
-            --type ios \
-            --file build/PetTalk.ipa \
-            --apiKey ${{ secrets.ASC_KEY_ID }} \
-            --apiIssuer ${{ secrets.ASC_KEY_ISSUER_ID }}
+          fastlane run upload_to_testflight \
+            ipa:"build/export/PetTalk.ipa" \
+            api_key_path:"/tmp/asc_key.json" \
+            skip_waiting_for_build_processing:true
