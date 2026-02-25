@@ -43,11 +43,13 @@ jobs:
 
       - name: Create temporary keychain
         run: |
-          security create-keychain -p "actions" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "actions" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
-          security list-keychains -d user -s build.keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain-db
+          security create-keychain -p "actions" $KEYCHAIN_PATH
+          security default-keychain -s $KEYCHAIN_PATH
+          security unlock-keychain -p "actions" $KEYCHAIN_PATH
+          security set-keychain-settings -t 3600 -u $KEYCHAIN_PATH
+          security list-keychains -d user -s $KEYCHAIN_PATH
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
 
       - name: Create distribution certificate and profile
         run: |
@@ -55,7 +57,7 @@ jobs:
           fastlane run get_certificates \
             api_key_path:"/tmp/asc_key.json" \
             platform:"ios" \
-            keychain_path:"$HOME/Library/Keychains/build.keychain" \
+            keychain_path:"$KEYCHAIN_PATH" \
             keychain_password:"actions" \
             generate_apple_certs:true
 
