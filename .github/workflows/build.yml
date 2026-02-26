@@ -23,7 +23,8 @@ jobs:
       - name: Select Xcode
         run: |
           sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
-          xcodebuild -downloadPlatform iOS
+          # Simulator runtime not required for build; don't fail on transient errors
+          xcodebuild -downloadPlatform iOS || true
           xcodebuild -runFirstLaunch
 
       - name: Print Xcode version
