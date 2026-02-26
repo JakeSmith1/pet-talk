@@ -6,10 +6,10 @@ import SwiftUI
 // MARK: - Constants
 
 private enum WarpConstants {
-    static let gridColumns = 12
-    static let gridRows = 12
+    static let gridColumns = 16
+    static let gridRows = 16
     /// Maximum vertical displacement in normalized sprite coordinates.
-    static let maxDisplacement: Float = 0.08
+    static let maxDisplacement: Float = 0.15
 }
 
 // MARK: - MouthAnimatorView

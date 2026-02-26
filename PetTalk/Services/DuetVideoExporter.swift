@@ -163,7 +163,15 @@ enum DuetVideoExporter {
         let rightContext = MouthAnimatorRenderer.RenderContext(image: rightImage, size: panelSize)
 
         for frame in 0..<totalFrames {
+            var readyWaitCount = 0
             while !videoInput.isReadyForMoreMediaData {
+                readyWaitCount += 1
+                if readyWaitCount > 500 { // ~5 seconds
+                    throw DuetExportError.writingFailed("Writer input not ready after timeout")
+                }
+                if writer.status == .failed {
+                    throw DuetExportError.writingFailed(writer.error?.localizedDescription ?? "Writer failed")
+                }
                 try await Task.sleep(nanoseconds: 10_000_000)
             }
 
@@ -213,8 +221,11 @@ enum DuetVideoExporter {
                 throw DuetExportError.writingFailed("Failed to append frame \(frame)")
             }
 
-            let videoProgress = Double(frame + 1) / Double(totalFrames) * 0.7
-            progressHandler(videoProgress)
+            // Report progress every 10 frames (video phase is 0.0 – 0.7).
+            if frame % 10 == 0 || frame == totalFrames - 1 {
+                let videoProgress = Double(frame + 1) / Double(totalFrames) * 0.7
+                progressHandler(videoProgress)
+            }
         }
 
         videoInput.markAsFinished()
@@ -424,7 +435,12 @@ enum DuetVideoExporter {
         }
 
         while reader.status == .reading {
+            var audioReadyWaitCount = 0
             while !audioInput.isReadyForMoreMediaData {
+                audioReadyWaitCount += 1
+                if audioReadyWaitCount > 500 { // ~5 seconds
+                    throw DuetExportError.writingFailed("Audio input not ready after timeout")
+                }
                 try await Task.sleep(nanoseconds: 10_000_000)
             }
 

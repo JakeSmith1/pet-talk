@@ -90,6 +90,7 @@ struct PhotoPickerView: View {
                     }
                 }
                 .presentationDetents([.large])
+                .interactiveDismissDisabled(true)
             }
         }
     }

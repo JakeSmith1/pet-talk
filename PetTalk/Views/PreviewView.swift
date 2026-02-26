@@ -41,56 +41,61 @@ struct PreviewView: View {
     // MARK: - Subviews
 
     private func previewContent(image: UIImage, mouthRegion: MouthRegion, audioURL: URL) -> some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Pet image with animation overlays
-                ZStack {
-                    MouthAnimatorView(
+        VStack(spacing: 0) {
+            // Fixed animation area (outside ScrollView so gestures aren't captured by scroll)
+            ZStack {
+                MouthAnimatorView(
+                    image: image,
+                    mouthRegion: mouthRegion,
+                    amplitude: audioAnalyzer.amplitude
+                )
+
+                // Eye animation overlay
+                if project.enableEyeAnimation, let eyeRegion = project.eyeRegion {
+                    let keyframe = currentEyeKeyframe
+                    EyeAnimatorView(
                         image: image,
+                        eyeRegion: eyeRegion,
+                        blinkAmount: keyframe.blinkAmount,
+                        eyebrowRaise: keyframe.eyebrowRaise
+                    )
+                    .allowsHitTesting(false)
+                }
+
+                // Accessory overlay
+                if !project.selectedAccessories.isEmpty {
+                    AccessoryOverlayView(
+                        placements: $project.selectedAccessories,
                         mouthRegion: mouthRegion,
+                        imageSize: image.size,
                         amplitude: audioAnalyzer.amplitude
                     )
+                }
+            }
+            .aspectRatio(image.size.width / image.size.height, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal)
 
-                    // Eye animation overlay
-                    if project.enableEyeAnimation, let eyeRegion = project.eyeRegion {
-                        let keyframe = currentEyeKeyframe
-                        EyeAnimatorView(
-                            image: image,
-                            eyeRegion: eyeRegion,
-                            blinkAmount: keyframe.blinkAmount,
-                            eyebrowRaise: keyframe.eyebrowRaise
-                        )
-                        .allowsHitTesting(false)
+            // Scrollable controls
+            ScrollView {
+                VStack(spacing: 24) {
+                    playbackControls(audioURL: audioURL)
+
+                    voiceEffectControls
+
+                    // Visual effects panel
+                    VisualEffectsView()
+
+                    MixingControlsView(mixer: audioMixer, showMusicPicker: $showMusicPicker)
+
+                    // Experimental features panel
+                    if featureFlags.hasAnyEnabled {
+                        experimentalFeaturesPanel
                     }
 
-                    // Accessory overlay
-                    if !project.selectedAccessories.isEmpty {
-                        AccessoryOverlayView(
-                            placements: $project.selectedAccessories,
-                            mouthRegion: mouthRegion,
-                            imageSize: image.size,
-                            amplitude: audioAnalyzer.amplitude
-                        )
-                    }
+                    exportButton(audioURL: audioURL)
                 }
-                .aspectRatio(image.size.width / image.size.height, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                playbackControls(audioURL: audioURL)
-
-                voiceEffectControls
-
-                // Visual effects panel
-                VisualEffectsView()
-
-                MixingControlsView(mixer: audioMixer, showMusicPicker: $showMusicPicker)
-
-                // Experimental features panel
-                if featureFlags.hasAnyEnabled {
-                    experimentalFeaturesPanel
-                }
-
-                exportButton(audioURL: audioURL)
+                .padding()
             }
         }
         .sheet(isPresented: $showMusicPicker) {

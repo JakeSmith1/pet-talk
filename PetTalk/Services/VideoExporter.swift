@@ -179,7 +179,15 @@ enum VideoExporter {
 
         for frame in 0..<totalFrames {
             // Wait until the input is ready to accept more data.
+            var readyWaitCount = 0
             while !videoInput.isReadyForMoreMediaData {
+                readyWaitCount += 1
+                if readyWaitCount > 500 { // ~5 seconds
+                    throw VideoExportError.writingFailed("Writer input not ready after timeout")
+                }
+                if writer.status == .failed {
+                    throw VideoExportError.writingFailed(writer.error?.localizedDescription ?? "Writer failed")
+                }
                 try await Task.sleep(nanoseconds: 10_000_000) // 10 ms
             }
 
@@ -210,9 +218,11 @@ enum VideoExporter {
                 throw VideoExportError.writeFailed("Failed to append video frame \(frame)")
             }
 
-            // Report progress (video phase is 0.0 – 0.8).
-            let videoProgress = Double(frame + 1) / Double(totalFrames) * 0.8
-            progressHandler(videoProgress)
+            // Report progress every 10 frames (video phase is 0.0 – 0.8).
+            if frame % 10 == 0 || frame == totalFrames - 1 {
+                let videoProgress = Double(frame + 1) / Double(totalFrames) * 0.8
+                progressHandler(videoProgress)
+            }
         }
 
         videoInput.markAsFinished()
@@ -246,7 +256,15 @@ enum VideoExporter {
 
         while reader.status == .reading {
             // Wait for writer input readiness.
+            var audioReadyWaitCount = 0
             while !audioInput.isReadyForMoreMediaData {
+                audioReadyWaitCount += 1
+                if audioReadyWaitCount > 500 { // ~5 seconds
+                    throw VideoExportError.writingFailed("Audio input not ready after timeout")
+                }
+                if writer.status == .failed {
+                    throw VideoExportError.writingFailed(writer.error?.localizedDescription ?? "Writer failed")
+                }
                 try await Task.sleep(nanoseconds: 10_000_000) // 10 ms
             }
 

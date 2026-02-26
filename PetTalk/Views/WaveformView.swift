@@ -104,7 +104,7 @@ struct WaveformView: View {
         return RoundedRectangle(cornerRadius: 3)
             .strokeBorder(Color.accentColor.opacity(0.6), lineWidth: 1.5)
             .frame(width: trimWidth, height: height)
-            .offset(x: startX + trimWidth / 2 - width / 2)
+            .position(x: startX + trimWidth / 2, y: height / 2)
     }
 
     // MARK: - Playback Indicator
@@ -116,7 +116,7 @@ struct WaveformView: View {
             .fill(Color.white)
             .frame(width: 2, height: height)
             .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 0)
-            .offset(x: xPos - width / 2)
+            .position(x: xPos, y: height / 2)
             .animation(.linear(duration: 0.05), value: playbackPosition)
     }
 
